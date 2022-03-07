@@ -19,6 +19,13 @@ function loadImage() {
   $('#toolbar').show();
 }
 
+function downloadImage() {
+  var link = document.createElement('a');
+  link.download = 'pixelized.png';
+  link.href = canvas.toDataURL()
+  link.click();
+}
+
 function getFitDimensions(w, h) {
   var containerWidth = document.getElementsByClassName('container')[0].offsetWidth;
   if (w < containerWidth) {
