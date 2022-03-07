@@ -6,24 +6,46 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous">
     <script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+    <link href="./main.css" rel="stylesheet">
   </head>
   <body>
     <div class="container mt-5 mb-5">
       <h1>Hello.</h1>
       <div class="row mb-3">
         <div class="col-lg-12">
+          I'm an image pixelizer.
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-lg-12">
           Upload an image:
-          <input type="file" name="inputImage" id="inputImage" accept="image/*" onchange="loadImage()">
+          <input type="file" name="input-image" id="input-image" accept="image/*" onchange="loadImageWithoutPalette()">
         </div>
       </div>
       <div class="row mb-3" id="toolbar" style="display: none">
         <div class="col-lg-12">
-          <form class="form-inline" id="toolbarForm">
-            <label for="pixelSize" class="mr-2">Pixel Size</label>
-            <input type="number" class="form-control" id="pixelSize" value="10">
-            <button type="button" class="btn btn-success ml-3" id="refresh" onclick="loadImage()"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+          <form class="form-inline" id="toolbar-form">
+            <label for="pixel-size" class="mr-2">Pixel Size</label>
+            <input type="number" class="form-control" id="pixel-size" value="10">
+            <button type="button" class="btn btn-success ml-3" id="refresh" onclick="loadImageWithoutPalette()"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
             <button type="button" class="btn btn-primary ml-2" id="download" onclick="downloadImage()"><i class="fa-solid fa-download"></i> Download</button>
+            <a class="btn palette-btn ml-2" data-toggle="collapse" href="#palette-container" role="button" aria-expanded="false" aria-controls="palette-container"><i class="fa-solid fa-palette"></i> Apply Limited Palette</a>
           </form>
+          <div class="collapse mt-3" id="palette-container">
+            <div class="card card-body">
+              <p>Select a limited number of colors to use in the pixelized version of this image. Use the <i class="fa-solid fa-eye-dropper"></i> eye dropper in the colorpicker to select colors from the image below, if desired.</p>
+              <div id="palette">
+                <div id="palette-colors">
+                  <label class="palette-color"><input type="color"></label>
+                </div>
+                <div>
+                  <button type="button" class="btn palette-btn" id="add-color" onclick="addColor()"><i class="fa-solid fa-plus"></i> Add Color</button>
+                  <button type="button" class="btn palette-btn" id="remove-color" onclick="removeColor()"><i class="fa-solid fa-minus"></i> Remove Color</button>
+                  <button type="button" class="btn btn-success" id="refresh-palette" onclick="loadImageWithPalette()"><i class="fa-solid fa-arrows-rotate"></i> Refresh with Limited Palette</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="row">

@@ -1,0 +1,22 @@
+.palette-btn {
+  color: white;
+  background-color: #9d1bc1;
+}
+
+.palette-btn:hover {
+  color: white;
+  background-color: #9d1bc1;
+}
+
+input[type=color] {
+  visibility: hidden;
+}
+
+.palette-color {
+  background-color: black;
+  border: 1px solid gray;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  margin-right: 5px;
+}
