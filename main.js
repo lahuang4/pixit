@@ -7,9 +7,9 @@ function loadImageWithoutPalette() {
 
 function loadImage(palette) {
   var reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = function (e) {
     var image = new Image();
-    image.onload = function() {
+    image.onload = function () {
       // Scale the image to fit the container.
       var [w, h] = getFitDimensions(image.width, image.height);
       canvas.width = w;
@@ -52,7 +52,7 @@ function paintImage(image) {
 // Inputs
 //
 
-$('#toolbar-form').submit(function() {
+$('#toolbar-form').submit(function () {
   loadImage();
   return false;
 });
@@ -146,11 +146,8 @@ function getClosestColor(color, palette) {
     return color;
   }
   // Calculate distances of the color to all members of the palette.
-  var diffs = palette.map(function(paletteColor) {
-    return Math.abs(color[0] - paletteColor[0]) +
-      Math.abs(color[1] - paletteColor[1]) +
-      Math.abs(color[2] - paletteColor[2]) +
-      Math.abs(color[3] - paletteColor[3]);
+  var diffs = palette.map(function (paletteColor) {
+    return deltaE00(sRGBToCIELab(color), sRGBToCIELab(paletteColor));
   });
   var minI = 0;
   var minDiff = diffs[0];
@@ -169,7 +166,7 @@ function getClosestColor(color, palette) {
 
 COLORPICKER = '<label class="palette-color"><input type="color"></label>';
 
-$(document).on('change', 'input[type=color]', function() {
+$(document).on('change', 'input[type=color]', function () {
   this.parentNode.style.backgroundColor = this.value;
 });
 
@@ -187,7 +184,7 @@ function removeColor() {
 
 function loadImageWithPalette() {
   var palette = [];
-  $('input[type=color]').each(function() {
+  $('input[type=color]').each(function () {
     palette.push(hexToRgba($(this).val()));
   });
   if (palette.length < 2) {
@@ -202,4 +199,170 @@ function hexToRgba(hex) {
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
     255];
+}
+
+//
+// Color distance helpers
+//
+
+/**
+ * Convert an sRGB color to CIELab
+ * CIELab is a color space used by the human eye, and is 
+ * the basis of the perceptual color difference algorithm
+ * defined by International Commission on Illumination 
+ * (abbreviated CIE) in 1976.
+ * 
+ * Read more about the color difference algorithms:
+ * https://en.wikipedia.org/wiki/Color_difference
+ * 
+ * Read more about the CIELab color space:
+ * https://en.wikipedia.org/wiki/CIELab
+ * 
+ * Read more about the CIE 1931 color space (also known as XYZ):
+ * https://en.wikipedia.org/wiki/CIE_1931_color_space
+ * 
+ * All formulas taken from:
+ * http://www.easyrgb.com/en/math.php
+ * 
+ * @param {Array} sRGB sRGB color in array format
+ */
+function sRGBToCIELab(sRGB) {
+  // First, convert sRGB to XYZ 
+  var var_R = sRGB[0] / 255;
+  var var_G = sRGB[1] / 255;
+  var var_B = sRGB[2] / 255;
+
+  function _XYZ_convert(value) {
+    // This is an approximation of an integral, see more 
+    // https://en.wikipedia.org/wiki/CIE_1931_color_space#Analytical_approximation
+    if (value > 0.04045) {
+      return 100 * Math.pow((value + 0.055) / 1.055, 2.4);
+    }
+    return 100 * value / 12.92;
+  }
+
+  var_R = _XYZ_convert(var_R);
+  var_G = _XYZ_convert(var_G);
+  var_B = _XYZ_convert(var_B);
+
+  var X = var_R * 0.4124 + var_G * 0.3576 + var_B * 0.1805;
+  var Y = var_R * 0.2126 + var_G * 0.7152 + var_B * 0.0722;
+  var Z = var_R * 0.0193 + var_G * 0.1192 + var_B * 0.9505;
+
+  // Then, convert XYZ to CIELab
+  const ref_X = 95.047;
+  const ref_Y = 100.000;
+  const ref_Z = 108.883;
+
+  var var_X = X / ref_X;
+  var var_Y = Y / ref_Y;
+  var var_Z = Z / ref_Z;
+
+  function _lab_convert(value) {
+    // Explanations for the constants:
+    // https://en.wikipedia.org/wiki/CIELAB_color_space#From_CIEXYZ_to_CIELAB
+    // Mostly chosen to match in value and slope at specific places.
+    if (value > 0.008856) {
+      return Math.pow(value, 1 / 3);
+    }
+    return 7.787 * value + 16 / 116;
+  }
+  var_X = _lab_convert(var_X);
+  var_Y = _lab_convert(var_Y);
+  var_Z = _lab_convert(var_Z);
+
+  // Explanation of CIELab values
+  // L = lightness of the color (L* = 0 yields black and L* = 100 indicates diffuse white; specular white may be higher), 
+  // a = its position between red and green (a*, where negative values indicate green and positive values indicate red)
+  // b = its position between yellow and blue (b*, where negative values indicate blue and positive values indicate yellow).
+  var L = (116 * var_Y) - 16;
+  var a = 500 * (var_X - var_Y);
+  var b = 200 * (var_Y - var_Z);
+
+  return [L, a, b];
+}
+
+/**
+ * The difference between two given colours with respect to the human eye
+ * using the CIEDE2000 algorithm.
+ * https://en.wikipedia.org/wiki/Color_difference#CIEDE2000
+ * For a more intuitive explanation and visualizations, see 
+ * http://zschuessler.github.io/DeltaE/learn/
+ * @param {Array} lab1 First LAB color in array
+ * @param {Array} lab2 Second LAB color in array
+*/
+function deltaE00(lab1, lab2) {
+  var l1 = lab1[0];
+  var a1 = lab1[1];
+  var b1 = lab1[2];
+  var l2 = lab2[0];
+  var a2 = lab2[1];
+  var b2 = lab2[2];
+  // Utility functions added to Math Object
+  Math.rad2deg = function (rad) {
+    return 360 * rad / (2 * Math.PI);
+  };
+  Math.deg2rad = function (deg) {
+    return (2 * Math.PI * deg) / 360;
+  };
+  // Start Equation
+  // Equation exist on the following URL 
+  // http://www.brucelindbloom.com/index.html?Eqn_DeltaE_CIE2000.html
+  const avgL = (l1 + l2) / 2;
+  const c1 = Math.sqrt(Math.pow(a1, 2) + Math.pow(b1, 2));
+  const c2 = Math.sqrt(Math.pow(a2, 2) + Math.pow(b2, 2));
+  const avgC = (c1 + c2) / 2;
+  const g = (1 - Math.sqrt(Math.pow(avgC, 7) / (Math.pow(avgC, 7) + Math.pow(25, 7)))) / 2;
+
+  const a1p = a1 * (1 + g);
+  const a2p = a2 * (1 + g);
+
+  const c1p = Math.sqrt(Math.pow(a1p, 2) + Math.pow(b1, 2));
+  const c2p = Math.sqrt(Math.pow(a2p, 2) + Math.pow(b2, 2));
+
+  const avgCp = (c1p + c2p) / 2;
+
+  let h1p = Math.rad2deg(Math.atan2(b1, a1p));
+  if (h1p < 0) {
+    h1p = h1p + 360;
+  }
+
+  let h2p = Math.rad2deg(Math.atan2(b2, a2p));
+  if (h2p < 0) {
+    h2p = h2p + 360;
+  }
+
+  const avghp = Math.abs(h1p - h2p) > 180 ? (h1p + h2p + 360) / 2 : (h1p + h2p) / 2;
+
+  const t = 1 - 0.17 * Math.cos(Math.deg2rad(avghp - 30)) + 0.24 * Math.cos(Math.deg2rad(2 * avghp)) + 0.32 * Math.cos(Math.deg2rad(3 * avghp + 6)) - 0.2 * Math.cos(Math.deg2rad(4 * avghp - 63));
+
+  let deltahp = h2p - h1p;
+  if (Math.abs(deltahp) > 180) {
+    if (h2p <= h1p) {
+      deltahp += 360;
+    } else {
+      deltahp -= 360;
+    }
+  }
+
+  const deltalp = l2 - l1;
+  const deltacp = c2p - c1p;
+
+  deltahp = 2 * Math.sqrt(c1p * c2p) * Math.sin(Math.deg2rad(deltahp) / 2);
+
+  const sl = 1 + ((0.015 * Math.pow(avgL - 50, 2)) / Math.sqrt(20 + Math.pow(avgL - 50, 2)));
+  const sc = 1 + 0.045 * avgCp;
+  const sh = 1 + 0.015 * avgCp * t;
+
+  const deltaro = 30 * Math.exp(-(Math.pow((avghp - 275) / 25, 2)));
+  const rc = 2 * Math.sqrt(Math.pow(avgCp, 7) / (Math.pow(avgCp, 7) + Math.pow(25, 7)));
+  const rt = -rc * Math.sin(2 * Math.deg2rad(deltaro));
+
+  const kl = 1;
+  const kc = 1;
+  const kh = 1;
+
+  const deltaE = Math.sqrt(Math.pow(deltalp / (kl * sl), 2) + Math.pow(deltacp / (kc * sc), 2) + Math.pow(deltahp / (kh * sh), 2) + rt * (deltacp / (kc * sc)) * (deltahp / (kh * sh)));
+
+  return deltaE;
 }
