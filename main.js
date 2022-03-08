@@ -146,11 +146,8 @@ function getClosestColor(color, palette) {
     return color;
   }
   // Calculate distances of the color to all members of the palette.
-  var diffs = palette.map(function(paletteColor) {
-    return Math.abs(color[0] - paletteColor[0]) +
-      Math.abs(color[1] - paletteColor[1]) +
-      Math.abs(color[2] - paletteColor[2]) +
-      Math.abs(color[3] - paletteColor[3]);
+  var diffs = palette.map(function (paletteColor) {
+    return deltaE(sRGBToCIELab(color), sRGBToCIELab(paletteColor));
   });
   var minI = 0;
   var minDiff = diffs[0];
@@ -187,7 +184,7 @@ function removeColor() {
 
 function loadImageWithPalette() {
   var palette = [];
-  $('input[type=color]').each(function() {
+  $('input[type=color]').each(function () {
     palette.push(hexToRgba($(this).val()));
   });
   if (palette.length < 2) {
@@ -202,4 +199,88 @@ function hexToRgba(hex) {
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
     255];
+}
+
+/**
+ * Convert an sRGB color to CIELAB
+ * http://www.easyrgb.com/en/math.php
+ * 
+ * @param {Array} sRGB sRGB color in array format
+ */
+function sRGBToCIELab(sRGB) {
+  // Convert sRGB to CIELab using the math from 
+  // First, convert sRGB to XYZ 
+  var var_R = sRGB[0] / 255;
+  var var_G = sRGB[1] / 255;
+  var var_B = sRGB[2] / 255;
+
+  function _XYZ_convert(value) {
+    if (value > 0.04045) {
+      return 100 * Math.pow((value + 0.055) / 1.055, 2.4);
+    }
+    return 100 * value / 12.92;
+  }
+
+  var_R = _XYZ_convert(var_R);
+  var_G = _XYZ_convert(var_G);
+  var_B = _XYZ_convert(var_B);
+
+  var X = var_R * 0.4124 + var_G * 0.3576 + var_B * 0.1805;
+  var Y = var_R * 0.2126 + var_G * 0.7152 + var_B * 0.0722;
+  var Z = var_R * 0.0193 + var_G * 0.1192 + var_B * 0.9505;
+
+  // Then, convert XYZ to CIELab
+  const ref_X = 95.047;
+  const ref_Y = 100.000;
+  const ref_Z = 108.883;
+
+  var var_X = X / ref_X;
+  var var_Y = Y / ref_Y;
+  var var_Z = Z / ref_Z;
+
+  function _lab_convert(value) {
+    if (value > 0.008856) {
+      return Math.pow(value, 1 / 3);
+    }
+    return 7.787 * value + 16 / 116;
+  }
+  var_X = _lab_convert(var_X);
+  var_Y = _lab_convert(var_Y);
+  var_Z = _lab_convert(var_Z);
+
+  var L = (116 * var_Y) - 16;
+  var a = 500 * (var_X - var_Y);
+  var b = 200 * (var_Y - var_Z);
+
+  return [L, a, b];
+}
+
+/**
+ * calculate the perceptual distance between colors in CIELAB
+ * https://github.com/THEjoezack/ColorMine/blob/master/ColorMine/ColorSpaces/Comparisons/Cie94Comparison.cs
+ * 
+ * @param {Array} lab1 First LAB color in array
+ * @param {Array} lab2 Second LAB color in array
+ */
+function deltaE(lab1, lab2) {
+  var deltaL = lab1[0] - lab2[0];
+  var deltaA = lab1[1] - lab2[1];
+  var deltaB = lab1[2] - lab2[2];
+
+  var c1 = Math.sqrt(lab1[1] * lab1[1] + lab1[2] * lab1[2]);
+  var c2 = Math.sqrt(lab2[1] * lab2[1] + lab2[2] * lab2[2]);
+
+  var deltaC = c1 - c2;
+  var deltaH = deltaA * deltaA + deltaB * deltaB - deltaC * deltaC;
+  deltaH = deltaH < 0 ? 0 : Math.sqrt(deltaH);
+
+  var sc = 1.0 + 0.045 * c1;
+  var sh = 1.0 + 0.015 * c1;
+
+  var deltaLKlsl = deltaL / (1.0);
+  var deltaCkcsc = deltaC / (sc);
+  var deltaHkhsh = deltaH / (sh);
+
+  var i = deltaLKlsl * deltaLKlsl + deltaCkcsc * deltaCkcsc + deltaHkhsh * deltaHkhsh;
+  return i < 0 ? 0 : Math.sqrt(i);
 }
