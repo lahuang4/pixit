@@ -223,7 +223,6 @@ function hexToRgba(hex) {
  * @param {Array} sRGB sRGB color in array format
  */
 function sRGBToCIELab(sRGB) {
-  // Convert sRGB to CIELab using the math from 
   // First, convert sRGB to XYZ 
   var var_R = sRGB[0] / 255;
   var var_G = sRGB[1] / 255;
