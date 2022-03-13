@@ -12,7 +12,7 @@ input[type=color] {
   visibility: hidden;
 }
 
-.palette-color {
+.palette-color, .repaint-color {
   background-color: black;
   border: 1px solid gray;
   width: 32px;

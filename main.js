@@ -57,6 +57,11 @@ $('#toolbar-form').submit(function () {
   return false;
 });
 
+// Only show one collapsed tool control at a time.
+$('#toolbar').on('show.bs.collapse', '.collapse', function () {
+  $('#toolbar').find('.collapse').collapse('hide');
+});
+
 function getPixelSize() {
   var pixelSize = getPixelSizeValue();
   document.getElementById('pixel-size').value = pixelSize;
@@ -106,14 +111,20 @@ function pixelate(imageData, pixelSize, palette) {
       // Calculate avg pixel color
       var avg = getAverageColor(imageData, x, y, pixelSize, pixelSize);
       var color = getClosestColor(avg, palette);
-      for (var nx = x; nx < x + pixelSize; nx++) {
-        for (var ny = y; ny < y + pixelSize; ny++) {
-          copyPixel(processedImageData, get1dCoords(imageData, nx, ny), color);
-        }
-      }
+      paintPixel(processedImageData, x, y, pixelSize, color);
     }
   }
   return processedImageData;
+}
+
+// Paints a "pixel" on imageData, starting at (x, y), of a given size and color.
+// color should be an [r, g, b, a] array.
+function paintPixel(imageData, x, y, size, color) {
+  for (var nx = x; nx < x + size; nx++) {
+    for (var ny = y; ny < y + size; ny++) {
+      copyPixel(imageData, get1dCoords(imageData, nx, ny), color);
+    }
+  }
 }
 
 function getAverageColor(imageData, x, y, w, h) {
@@ -127,7 +138,7 @@ function getAverageColor(imageData, x, y, w, h) {
       a.push(pixel[3]);
     }
   }
-  return [getAverage(r), getAverage(g), getAverage(b), getAverage(a)]
+  return [getAverage(r), getAverage(g), getAverage(b), getAverage(a)];
 }
 
 function getAverage(array) {
@@ -161,6 +172,58 @@ function getClosestColor(color, palette) {
 }
 
 //
+// Painting helpers
+//
+
+var paint;
+
+// Add mouse handlers.
+canvas.addEventListener('mousemove', mouseMove);
+canvas.addEventListener('mousedown', mouseDown);
+canvas.addEventListener('mouseup', mouseUp);
+
+function mouseDown(e) {
+  paint = true;
+  var canvasRect = canvas.getBoundingClientRect();
+  var x = e.pageX - canvasRect.left - window.scrollX;
+  var y = e.pageY - canvasRect.top - window.scrollY;
+  repaint(x, y);
+}
+
+function mouseUp(e) {
+  paint = false;
+}
+
+function mouseMove(e) {
+  if (!paint) {
+    return;
+  }
+  var canvasRect = canvas.getBoundingClientRect();
+  var x = e.pageX - canvasRect.left - window.scrollX;
+  var y = e.pageY - canvasRect.top - window.scrollY;
+  repaint(x, y);
+}
+
+// Given a point (x, y), repaints the "pixel" that it belongs to.
+function repaint(x, y) {
+  // Get repaint color.
+  var color = [0, 0, 0, 255];
+  $('#repaint-colors input[type=color]').each(function () {
+    color = hexToRgba($(this).val());
+  });
+
+  // Locate the top-left corner of the current pixel, based on the pixel size.
+  var pixelSize = getPixelSize();
+  var startX = Math.floor(x / pixelSize) * pixelSize;
+  var startY = Math.floor(y / pixelSize) * pixelSize;
+
+  // Repaint all pixels corresponding to this pixel
+  var processedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  paintPixel(processedImageData, startX, startY, pixelSize, color);
+  paintImage(processedImageData);
+}
+
+//
 // Palette helpers
 //
 
@@ -184,7 +247,7 @@ function removeColor() {
 
 function loadImageWithPalette() {
   var palette = [];
-  $('input[type=color]').each(function () {
+  $('#palette-colors input[type=color]').each(function () {
     palette.push(hexToRgba($(this).val()));
   });
   if (palette.length < 2) {
